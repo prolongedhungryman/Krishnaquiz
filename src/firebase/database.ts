@@ -11,6 +11,43 @@ import { database, isFirebaseConfigured } from './config';
 import { QuizData, QuizStatus, DisplayMode, QuizEvent, Team } from '../types';
 import { INITIAL_QUIZ_DATA } from '../data/initialQuizData';
 
+/**
+ * Firebase RTDB stores JS arrays as objects with numeric keys.
+ * This function restores data from Firebase and merges in local questions data.
+ * We only store dynamic data (status, teams, events, answeredQuestions) in Firebase,
+ * not the full question bank, to keep writes small and fast.
+ */
+function normalizeFirebaseData(val: Record<string, unknown>): QuizData {
+  if (!val) return INITIAL_QUIZ_DATA;
+
+  // Start with full local initial data (includes all questions)
+  const result: QuizData = {
+    ...INITIAL_QUIZ_DATA,
+    // Override with Firebase dynamic data
+    status: (val.status as QuizData['status']) || INITIAL_QUIZ_DATA.status,
+    teams: (val.teams as QuizData['teams']) || {},
+    events: (val.events as QuizData['events']) || {},
+  };
+
+  // Normalize answeredQuestions - Firebase may store arrays as objects too
+  const rawAQ = val.answeredQuestions as Record<string, unknown> | undefined;
+  if (rawAQ && typeof rawAQ === 'object') {
+    const normalizedAQ: Record<string, string[]> = {};
+    for (const [roundId, answered] of Object.entries(rawAQ)) {
+      if (answered && !Array.isArray(answered)) {
+        normalizedAQ[roundId] = Object.values(answered as Record<string, string>);
+      } else {
+        normalizedAQ[roundId] = (answered as string[]) || [];
+      }
+    }
+    result.answeredQuestions = normalizedAQ;
+  } else {
+    result.answeredQuestions = {};
+  }
+
+  return result;
+}
+
 const LOCAL_STORAGE_KEY = 'quiz_competition_state_v1';
 const BROADCAST_CHANNEL_NAME = 'quiz_competition_broadcast';
 
@@ -59,10 +96,17 @@ export function subscribeToQuizState(
     const quizRef = ref(database, 'quiz');
     
     // Check if initial data exists on Firebase; if not, bootstrap it
+    // Only seed the dynamic data (NOT questions, to keep Firebase writes small)
     get(quizRef).then((snapshot: DataSnapshot) => {
       if (!snapshot.exists()) {
-        console.info('[Firebase] Initializing database with seed data...');
-        set(quizRef, INITIAL_QUIZ_DATA).catch((err) => {
+        console.info('[Firebase] Initializing database with minimal seed data...');
+        const seedData = {
+          status: INITIAL_QUIZ_DATA.status,
+          teams: {},
+          events: INITIAL_QUIZ_DATA.events || {},
+          answeredQuestions: {},
+        };
+        set(quizRef, seedData).catch((err) => {
           console.error('[Firebase] Failed to seed database:', err);
         });
       }
@@ -75,7 +119,7 @@ export function subscribeToQuizState(
       (snapshot: DataSnapshot) => {
         if (snapshot.exists()) {
           const val = snapshot.val() as QuizData;
-          onData(val);
+          onData(normalizeFirebaseData(val));
         } else {
           onData(INITIAL_QUIZ_DATA);
         }
@@ -203,7 +247,7 @@ export async function updateQuizStatus(partialStatus: Partial<QuizStatus>): Prom
   if (isFirebaseConfigured && database) {
     const updates: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(partialStatus)) {
-      updates[`quiz/status/${key}`] = value;
+      updates[`quiz/status/${key}`] = value === undefined ? null : value;
     }
     updates['quiz/status/updatedAt'] = serverTimestamp();
     await update(ref(database), updates);

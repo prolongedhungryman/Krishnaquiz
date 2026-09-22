@@ -14,11 +14,12 @@ import {
   Play,
   Pause,
   SkipForward,
-  Timer,
+  BarChart3,
 } from 'lucide-react';
 import { useQuiz } from '../../hooks/useQuiz';
 import { useRouter } from '../../context/RouterContext';
 import { Badge } from '../../components/ui/Badge';
+import { Team } from '../../types';
 
 // General Round Rules
 const GENERAL_ROUND_RULES = [
@@ -55,7 +56,10 @@ export const QuizControlPage: React.FC = () => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showRules, setShowRules] = useState(false);
-  const [isPassed, setIsPassed] = useState(false); // Track if current question was passed
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [isPassed, setIsPassed] = useState(false);
+  // Local selected team state (avoids Firebase async delay for selection)
+  const [localSelectedTeamId, setLocalSelectedTeamId] = useState<string | undefined>(undefined);
 
   // Timer
   const [timeLeft, setTimeLeft] = useState(60);
@@ -80,7 +84,9 @@ export const QuizControlPage: React.FC = () => {
     setTimerExpired(false);
     setShowAnswer(false);
     setIsPassed(false);
-    selectAnsweringTeam(undefined);
+    setLocalSelectedTeamId(undefined);
+    // Clear Firebase selection too
+    selectAnsweringTeam(undefined).catch(() => {});
   }, [currentQuestion?.id]);
 
   // Sync localMode
@@ -104,6 +110,7 @@ export const QuizControlPage: React.FC = () => {
     setLocalMode('QUESTION');
     setShowAnswer(false);
     setIsPassed(false);
+    setLocalSelectedTeamId(undefined);
     changeDisplayMode('QUESTION');
   };
 
@@ -112,35 +119,38 @@ export const QuizControlPage: React.FC = () => {
     changeDisplayMode('GRID');
   };
 
+  const handleSelectTeam = (teamId: string) => {
+    setLocalSelectedTeamId(teamId);
+    // Also sync to Firebase (best-effort, don't block UI)
+    selectAnsweringTeam(teamId).catch(() => {});
+  };
+
   const handleCorrect = async (teamId: string) => {
-    const pts = isPassed ? 5 : (currentQuestion?.points || 10); // Half marks for passed questions
+    const pts = isPassed ? 5 : (currentQuestion?.points || 10);
     await awardPoints(teamId, pts);
     if (activeRound && currentQuestion) {
       await markQuestionAnswered(activeRound.id, currentQuestion.id);
     }
-    selectAnsweringTeam(undefined);
+    setLocalSelectedTeamId(undefined);
+    selectAnsweringTeam(undefined).catch(() => {});
     setLocalMode('GRID');
     changeDisplayMode('GRID');
   };
 
   const handleWrong = async () => {
-    // No points deducted, just go back to grid
-    if (activeRound && currentQuestion && !isPassed) {
-      // If not passed, mark as answered (wrong, no retry)
-      // But if passed once already, also mark done
-    }
     if (isPassed && activeRound && currentQuestion) {
-      // Passed and second team also wrong — mark done, no points
       await markQuestionAnswered(activeRound.id, currentQuestion.id);
     }
-    selectAnsweringTeam(undefined);
+    setLocalSelectedTeamId(undefined);
+    selectAnsweringTeam(undefined).catch(() => {});
     setLocalMode('GRID');
     changeDisplayMode('GRID');
   };
 
   const handlePass = () => {
     setIsPassed(true);
-    selectAnsweringTeam(undefined); // Clear selection so admin picks next team
+    setLocalSelectedTeamId(undefined);
+    selectAnsweringTeam(undefined).catch(() => {});
   };
 
   const teamList = Object.values(teams);
@@ -150,6 +160,16 @@ export const QuizControlPage: React.FC = () => {
 
   const timerColor =
     timerExpired ? 'text-red-500' : timeLeft <= 10 ? 'text-red-400' : timeLeft <= 20 ? 'text-amber-400' : 'text-emerald-400';
+
+  // Build ranked leaderboard for popup
+  const rankedTeams = [...teamList].sort((a, b) => b.score - a.score).map((t, i) => ({ ...t, rank: i + 1 }));
+
+  const rankEmoji = (rank: number) => {
+    if (rank === 1) return '🥇';
+    if (rank === 2) return '🥈';
+    if (rank === 3) return '🥉';
+    return `#${rank}`;
+  };
 
   return (
     <div id="admin-quiz-control-page" className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
@@ -168,7 +188,7 @@ export const QuizControlPage: React.FC = () => {
           <button onClick={() => setShowRules(true)} className="px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer">
             <BookOpen className="w-3 h-3 inline mr-1" />Rules
           </button>
-          <button onClick={() => navigate('/admin')} className="px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 cursor-pointer">
+          <button onClick={() => setShowLeaderboard(true)} className="px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 cursor-pointer">
             <Trophy className="w-3 h-3 inline mr-1" />Leaderboard
           </button>
           <button onClick={toggleFullscreen} className="px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer">
@@ -200,6 +220,49 @@ export const QuizControlPage: React.FC = () => {
         </div>
       )}
 
+      {/* Leaderboard Modal — shows current round scores */}
+      {showLeaderboard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl">
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center">
+              <h2 className="text-lg font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-amber-500" />
+                Live Scores — {activeRound?.title || 'General Round'}
+              </h2>
+              <button onClick={() => setShowLeaderboard(false)} className="text-slate-400 hover:text-white text-xl cursor-pointer">✕</button>
+            </div>
+            <div className="p-5 space-y-3">
+              {rankedTeams.length === 0 ? (
+                <div className="text-center py-6 text-slate-400 text-sm">No teams registered yet.</div>
+              ) : (
+                rankedTeams.map((team) => (
+                  <div
+                    key={team.id}
+                    className="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-slate-800/50 relative overflow-hidden"
+                  >
+                    <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: team.color }} />
+                    <div className="flex items-center gap-3 pl-3">
+                      <span className="text-lg font-bold w-8 text-center">{rankEmoji(team.rank!)}</span>
+                      <div>
+                        <div className="font-bold text-sm text-white uppercase">{team.shortName}</div>
+                        <div className="text-xs text-slate-400">{team.name}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-black text-2xl text-white tabular-nums">{team.score}</span>
+                      <span className="block text-[10px] font-bold uppercase text-slate-400">pts</span>
+                    </div>
+                  </div>
+                ))
+              )}
+              <button onClick={() => setShowLeaderboard(false)} className="w-full mt-2 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs uppercase tracking-widest cursor-pointer">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main */}
       <main className="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-5">
         {localMode === 'GRID' ? (
@@ -215,16 +278,17 @@ export const QuizControlPage: React.FC = () => {
                 const isAnswered = data.answeredQuestions?.[activeRound.id]?.includes(q.id);
                 if (isAnswered) {
                   return (
-                    <div key={q.id} className="aspect-square rounded-lg border border-slate-700 bg-slate-800/50 opacity-30 flex items-center justify-center">
-                      <Check className="w-4 h-4 text-slate-500" />
-                    </div>
+                    <button key={q.id} disabled className="aspect-square rounded-lg border border-slate-700/50 bg-slate-800/30 opacity-50 flex flex-col items-center justify-center cursor-not-allowed">
+                      <span className="text-xs font-bold text-slate-500">{q.number}</span>
+                      <Check className="w-4 h-4 text-emerald-500/50 mt-1" />
+                    </button>
                   );
                 }
                 return (
                   <button
                     key={q.id}
                     onClick={() => handleSelectQuestion(idx)}
-                    className="aspect-square text-sm font-bold rounded-lg cursor-pointer transition-all bg-slate-800 text-indigo-300 hover:bg-indigo-900/40 hover:text-white border border-slate-700 hover:border-indigo-500"
+                    className="aspect-square text-sm font-bold rounded-lg cursor-pointer transition-all bg-slate-800 text-indigo-300 hover:bg-indigo-900/40 hover:text-white border border-slate-700 hover:border-indigo-500 shadow-sm"
                   >
                     {q.number}
                   </button>
@@ -263,7 +327,7 @@ export const QuizControlPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Question Display — takes main space */}
+            {/* Question Display */}
             <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 sm:p-8">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 block mb-2">
                 Question {questionNumStr} · {activeRound?.title} · {currentQuestion?.points || 10} pts
@@ -273,7 +337,7 @@ export const QuizControlPage: React.FC = () => {
                 {currentQuestion?.question || 'No question available.'}
               </p>
 
-              {/* Answer reveal — below the question */}
+              {/* Answer reveal */}
               <div className="mt-5 pt-4 border-t border-slate-800">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
@@ -298,7 +362,7 @@ export const QuizControlPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Answering Team + Actions — immediately visible, no scrolling */}
+            {/* Answering Team + Actions */}
             <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-sm text-white uppercase tracking-tight">
@@ -316,7 +380,7 @@ export const QuizControlPage: React.FC = () => {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {teamList.map((team) => {
-                  const isSelected = status.selectedAnsweringTeamId === team.id;
+                  const isSelected = localSelectedTeamId === team.id;
                   return (
                     <div
                       key={team.id}
@@ -334,8 +398,8 @@ export const QuizControlPage: React.FC = () => {
 
                       {!isSelected ? (
                         <button
-                          onClick={() => selectAnsweringTeam(team.id)}
-                          className="w-full py-1.5 rounded-md font-bold text-[10px] uppercase bg-slate-700 text-slate-300 hover:bg-slate-600 cursor-pointer"
+                          onClick={() => handleSelectTeam(team.id)}
+                          className="w-full py-1.5 rounded-md font-bold text-[10px] uppercase bg-slate-700 text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer transition-colors"
                         >
                           Select
                         </button>
