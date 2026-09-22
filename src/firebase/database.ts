@@ -192,7 +192,22 @@ export async function updateTeamScore(
       },
     };
 
-    await update(ref(database), updates);
+    try {
+      await update(ref(database), updates);
+    } catch (err) {
+      console.error('[Firebase] Failed to award points, falling back to local state:', err);
+      // Fallback to local
+      const state = getLocalState();
+      const team = state.teams[teamId];
+      if (team) {
+        team.score = newScore;
+        state.status.lastScoredTeamId = teamId;
+        state.status.updatedAt = Date.now();
+        if (!state.events) state.events = {};
+        state.events[eventId] = updates[`quiz/events/${eventId}`] as QuizEvent;
+        saveLocalState(state);
+      }
+    }
   } else {
     const state = getLocalState();
     const team = state.teams[teamId];
@@ -226,10 +241,20 @@ export async function updateTeamScore(
 export async function setTeamScore(teamId: string, newScore: number): Promise<void> {
   const safeScore = Math.max(0, Math.floor(newScore));
   if (isFirebaseConfigured && database) {
-    await update(ref(database), {
-      [`quiz/teams/${teamId}/score`]: safeScore,
-      [`quiz/status/updatedAt`]: serverTimestamp(),
-    });
+    try {
+      await update(ref(database), {
+        [`quiz/teams/${teamId}/score`]: safeScore,
+        [`quiz/status/updatedAt`]: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('[Firebase] Failed to set team score, falling back to local state:', err);
+      const state = getLocalState();
+      if (state.teams[teamId]) {
+        state.teams[teamId].score = safeScore;
+        state.status.updatedAt = Date.now();
+        saveLocalState(state);
+      }
+    }
   } else {
     const state = getLocalState();
     if (state.teams[teamId]) {
@@ -250,16 +275,18 @@ export async function updateQuizStatus(partialStatus: Partial<QuizStatus>): Prom
       updates[`quiz/status/${key}`] = value === undefined ? null : value;
     }
     updates['quiz/status/updatedAt'] = serverTimestamp();
-    await update(ref(database), updates);
-  } else {
-    const state = getLocalState();
-    state.status = {
-      ...state.status,
-      ...partialStatus,
-      updatedAt: Date.now(),
-    };
-    saveLocalState(state);
-  }
+    try {
+      await update(ref(database), updates);
+    } catch (err) {
+      console.error('[Firebase] Failed to update quiz status, falling back to local state:', err);
+      const state = getLocalState();
+      state.status = {
+        ...state.status,
+        ...partialStatus,
+        updatedAt: Date.now(),
+      };
+      saveLocalState(state);
+    }
 }
 
 /**
@@ -314,7 +341,17 @@ export async function resetAllScores(): Promise<void> {
         updates[`quiz/teams/${teamId}/score`] = 0;
       }
       updates['quiz/status/updatedAt'] = serverTimestamp();
-      await update(ref(database), updates);
+      try {
+        await update(ref(database), updates);
+      } catch (err) {
+        console.error('[Firebase] Failed to reset scores, falling back to local state:', err);
+        const state = getLocalState();
+        for (const key of Object.keys(state.teams)) {
+          state.teams[key].score = 0;
+        }
+        state.status.updatedAt = Date.now();
+        saveLocalState(state);
+      }
     }
   } else {
     const state = getLocalState();
@@ -340,12 +377,24 @@ export async function resetEntireCompetition(): Promise<void> {
     },
   };
   if (isFirebaseConfigured && database) {
-    await update(ref(database), {
-      'quiz/teams': {},
-      'quiz/answeredQuestions': {},
-      'quiz/status': resetData.status,
-      'quiz/status/updatedAt': serverTimestamp(),
-    });
+    try {
+      await update(ref(database), {
+        'quiz/teams': {},
+        'quiz/answeredQuestions': {},
+        'quiz/status': resetData.status,
+        'quiz/status/updatedAt': serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('[Firebase] Failed to reset entire competition, falling back to local state:', err);
+      const state = getLocalState();
+      state.teams = {};
+      state.answeredQuestions = {};
+      state.status = {
+        ...INITIAL_QUIZ_DATA.status,
+        updatedAt: Date.now(),
+      };
+      saveLocalState(state);
+    }
   } else {
     const state = getLocalState();
     state.teams = {};
@@ -363,10 +412,19 @@ export async function resetEntireCompetition(): Promise<void> {
  */
 export async function addTeam(team: Team): Promise<void> {
   if (isFirebaseConfigured && database) {
-    await update(ref(database), {
-      [`quiz/teams/${team.id}`]: team,
-      [`quiz/status/updatedAt`]: serverTimestamp(),
-    });
+    try {
+      await update(ref(database), {
+        [`quiz/teams/${team.id}`]: team,
+        [`quiz/status/updatedAt`]: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('[Firebase] Failed to add team, falling back to local state:', err);
+      const state = getLocalState();
+      if (!state.teams) state.teams = {};
+      state.teams[team.id] = team;
+      state.status.updatedAt = Date.now();
+      saveLocalState(state);
+    }
   } else {
     const state = getLocalState();
     state.teams[team.id] = team;
@@ -380,11 +438,18 @@ export async function addTeam(team: Team): Promise<void> {
  */
 export async function removeTeam(teamId: string): Promise<void> {
   if (isFirebaseConfigured && database) {
-    // using set(ref, null) to delete
-    await set(ref(database, `quiz/teams/${teamId}`), null);
-    await update(ref(database), {
-      [`quiz/status/updatedAt`]: serverTimestamp(),
-    });
+    try {
+      await set(ref(database, `quiz/teams/${teamId}`), null);
+      await update(ref(database), {
+        [`quiz/status/updatedAt`]: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('[Firebase] Failed to remove team, falling back to local state:', err);
+      const state = getLocalState();
+      delete state.teams[teamId];
+      state.status.updatedAt = Date.now();
+      saveLocalState(state);
+    }
   } else {
     const state = getLocalState();
     delete state.teams[teamId];
