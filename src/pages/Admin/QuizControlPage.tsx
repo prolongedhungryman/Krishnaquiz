@@ -33,6 +33,15 @@ const GENERAL_ROUND_RULES = [
   'The quiz master\'s decision is final.',
 ];
 
+const GUESSING_ROUND_RULES = [
+  'This round will be common for all team.',
+  'The time will be one minute.',
+  'The participants have to provide the answer by writing in paper.',
+  'Each houses are required to write the name of their houses.',
+  'Those houses will be near to exact answer will be given marks.',
+  'Each question contain 10 marks.'
+];
+
 export const QuizControlPage: React.FC = () => {
   const {
     status,
@@ -126,15 +135,20 @@ export const QuizControlPage: React.FC = () => {
   };
 
   const handleCorrect = async (teamId: string) => {
-    const pts = isPassed ? 5 : (currentQuestion?.points || 10);
+    const pts = activeRound?.id === 'guessing' ? 10 : (isPassed ? 5 : (currentQuestion?.points || 10));
     await awardPoints(teamId, pts);
     if (activeRound && currentQuestion) {
-      await markQuestionAnswered(activeRound.id, currentQuestion.id);
+      // Don't auto-mark answered in guessing round immediately so admin can award multiple teams
+      if (activeRound.id !== 'guessing') {
+        await markQuestionAnswered(activeRound.id, currentQuestion.id);
+      }
     }
-    setLocalSelectedTeamId(undefined);
-    selectAnsweringTeam(undefined).catch(() => {});
-    setLocalMode('GRID');
-    changeDisplayMode('GRID');
+    if (activeRound?.id !== 'guessing') {
+      setLocalSelectedTeamId(undefined);
+      selectAnsweringTeam(undefined).catch(() => {});
+      setLocalMode('GRID');
+      changeDisplayMode('GRID');
+    }
   };
 
   const handleWrong = async () => {
@@ -202,11 +216,13 @@ export const QuizControlPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-slate-900 rounded-2xl w-full max-w-lg border border-slate-700 shadow-2xl">
             <div className="p-5 border-b border-slate-800 flex justify-between items-center">
-              <h2 className="text-lg font-bold uppercase tracking-wider text-white">General Round Rules</h2>
+              <h2 className="text-lg font-bold uppercase tracking-wider text-white">
+                {activeRound?.title} Rules
+              </h2>
               <button onClick={() => setShowRules(false)} className="text-slate-400 hover:text-white text-xl cursor-pointer">✕</button>
             </div>
             <div className="p-5 space-y-2">
-              {GENERAL_ROUND_RULES.map((rule, i) => (
+              {(activeRound?.id === 'guessing' ? GUESSING_ROUND_RULES : GENERAL_ROUND_RULES).map((rule, i) => (
                 <p key={i} className="flex items-start gap-2.5 text-sm text-slate-200">
                   <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] font-bold mt-0.5">{i + 1}</span>
                   {rule}
@@ -366,14 +382,30 @@ export const QuizControlPage: React.FC = () => {
             <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-sm text-white uppercase tracking-tight">
-                  {isPassed ? '⟫ Select Next Team (Passed Question — 5 pts)' : 'Select Answering Team'}
+                  {activeRound?.id === 'guessing' 
+                    ? 'Award Marks (Multiple allowed)'
+                    : (isPassed ? '⟫ Select Next Team (Passed Question — 5 pts)' : 'Select Answering Team')}
                 </h3>
-                {!isPassed && (
+                {!isPassed && activeRound?.id !== 'guessing' && (
                   <button
                     onClick={handlePass}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold uppercase bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20 cursor-pointer"
                   >
                     <SkipForward className="w-3.5 h-3.5" /> Pass
+                  </button>
+                )}
+                {activeRound?.id === 'guessing' && (
+                  <button
+                    onClick={async () => {
+                      if (activeRound && currentQuestion) {
+                        await markQuestionAnswered(activeRound.id, currentQuestion.id);
+                        setLocalMode('GRID');
+                        changeDisplayMode('GRID');
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase bg-indigo-600 text-white cursor-pointer"
+                  >
+                    Done (Back to Grid)
                   </button>
                 )}
               </div>
@@ -396,7 +428,14 @@ export const QuizControlPage: React.FC = () => {
                         <span className="text-[10px] text-slate-400">{team.score} pts</span>
                       </div>
 
-                      {!isSelected ? (
+                      {activeRound?.id === 'guessing' ? (
+                        <button
+                          onClick={() => handleCorrect(team.id)}
+                          className="w-full py-1.5 rounded-md font-bold text-[10px] uppercase text-white bg-emerald-600 hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-0.5"
+                        >
+                          <CheckCircle2 className="w-3 h-3" /> +10 Pts
+                        </button>
+                      ) : !isSelected ? (
                         <button
                           onClick={() => handleSelectTeam(team.id)}
                           className="w-full py-1.5 rounded-md font-bold text-[10px] uppercase bg-slate-700 text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer transition-colors"

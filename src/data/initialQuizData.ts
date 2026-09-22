@@ -1,5 +1,6 @@
 import { QuizData, Team, Round, Question } from '../types';
 import { generalQuestions } from './generalQuestions';
+import { guessingQuestions } from './guessingQuestions';
 
 export const INITIAL_TEAMS: Record<string, Team> = {};
 
@@ -33,8 +34,8 @@ export const INITIAL_ROUNDS: Record<string, Round> = {
     description: 'Progressive clues.',
     order: 2,
     defaultPoints: 10,
-    totalQuestions: 10,
-    questions: generateDummyQuestions('guessing', 10),
+    totalQuestions: 6,
+    questions: guessingQuestions,
   },
   multimedia: {
     id: 'multimedia',
