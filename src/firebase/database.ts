@@ -17,6 +17,16 @@ import { INITIAL_QUIZ_DATA } from '../data/initialQuizData';
 // Once false, ALL reads AND writes use localStorage + BroadcastChannel.
 let firebaseAlive = isFirebaseConfigured && !!database;
 
+// Helper to prevent infinite hangs when Firebase is unreachable
+function withTimeout<T>(promise: Promise<T>, ms: number = 3000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => 
+      setTimeout(() => reject(new Error("Firebase operation timed out")), ms)
+    )
+  ]);
+}
+
 function useFirebase(): boolean {
   return firebaseAlive && isFirebaseConfigured && !!database;
 }
@@ -120,7 +130,7 @@ export function subscribeToQuizState(
   let unsubLocal: (() => void) | null = null;
 
   // Try a one-time read to verify Firebase is actually reachable
-  get(quizRef)
+  withTimeout(get(quizRef), 5000)
     .then((snapshot: DataSnapshot) => {
       // Firebase is alive! Seed if needed and start listening
       if (!snapshot.exists()) {
@@ -130,7 +140,7 @@ export function subscribeToQuizState(
           events: INITIAL_QUIZ_DATA.events || {},
           answeredQuestions: {},
         };
-        set(quizRef, seedData).catch(() => {});
+        withTimeout(set(quizRef, seedData)).catch(() => {});
       }
 
       // Set up realtime listener
@@ -212,7 +222,7 @@ export async function updateTeamScore(
       const currentScore = snapshot.exists() ? (snapshot.val() as number) : 0;
       const newScore = Math.max(0, currentScore + delta);
 
-      await update(ref(database!), {
+      await withTimeout(update(ref(database!), {
         [`quiz/teams/${teamId}/score`]: newScore,
         [`quiz/status/lastScoredTeamId`]: teamId,
         [`quiz/status/updatedAt`]: serverTimestamp(),
@@ -224,7 +234,7 @@ export async function updateTeamScore(
           points: delta,
           description: customDescription || `Awarded ${delta > 0 ? '+' : ''}${delta} points`,
         },
-      });
+      }));
       return;
     } catch (err: any) {
       killFirebase(err.message);
@@ -257,10 +267,10 @@ export async function setTeamScore(teamId: string, newScore: number): Promise<vo
   const safeScore = Math.max(0, Math.floor(newScore));
   if (useFirebase()) {
     try {
-      await update(ref(database!), {
+      await withTimeout(update(ref(database!), {
         [`quiz/teams/${teamId}/score`]: safeScore,
         [`quiz/status/updatedAt`]: serverTimestamp(),
-      });
+      }));
       return;
     } catch (err: any) {
       killFirebase(err.message);
@@ -283,7 +293,7 @@ export async function updateQuizStatus(partialStatus: Partial<QuizStatus>): Prom
         updates[`quiz/status/${key}`] = value === undefined ? null : value;
       }
       updates['quiz/status/updatedAt'] = serverTimestamp();
-      await update(ref(database!), updates);
+      await withTimeout(update(ref(database!), updates));
       return;
     } catch (err: any) {
       killFirebase(err.message);
@@ -333,7 +343,7 @@ export async function resetAllScores(): Promise<void> {
           updates[`quiz/teams/${teamId}/score`] = 0;
         }
         updates['quiz/status/updatedAt'] = serverTimestamp();
-        await update(ref(database!), updates);
+        await withTimeout(update(ref(database!), updates));
         return;
       }
     } catch (err: any) {
@@ -352,14 +362,14 @@ export async function resetAllScores(): Promise<void> {
 export async function resetEntireCompetition(): Promise<void> {
   if (useFirebase()) {
     try {
-      await update(ref(database!), {
+      await withTimeout(update(ref(database!), {
         'quiz/teams': {},
         'quiz/answeredQuestions': {},
         'quiz/status': {
           ...INITIAL_QUIZ_DATA.status,
           updatedAt: serverTimestamp(),
         },
-      });
+      }));
       return;
     } catch (err: any) {
       killFirebase(err.message);
@@ -381,10 +391,10 @@ export async function resetEntireCompetition(): Promise<void> {
 export async function addTeam(team: Team): Promise<void> {
   if (useFirebase()) {
     try {
-      await update(ref(database!), {
+      await withTimeout(update(ref(database!), {
         [`quiz/teams/${team.id}`]: team,
         [`quiz/status/updatedAt`]: serverTimestamp(),
-      });
+      }));
       return;
     } catch (err: any) {
       killFirebase(err.message);
@@ -401,10 +411,10 @@ export async function addTeam(team: Team): Promise<void> {
 export async function removeTeam(teamId: string): Promise<void> {
   if (useFirebase()) {
     try {
-      await set(ref(database!, `quiz/teams/${teamId}`), null);
-      await update(ref(database!), {
+      await withTimeout(set(ref(database!, `quiz/teams/${teamId}`), null));
+      await withTimeout(update(ref(database!), {
         [`quiz/status/updatedAt`]: serverTimestamp(),
-      });
+      }));
       return;
     } catch (err: any) {
       killFirebase(err.message);
@@ -428,10 +438,10 @@ export async function markQuestionAnswered(roundId: string, questionId: string):
       }
       if (!currentList.includes(questionId)) {
         currentList.push(questionId);
-        await update(ref(database!), {
+        await withTimeout(update(ref(database!), {
           [`quiz/answeredQuestions/${roundId}`]: currentList,
           [`quiz/status/updatedAt`]: serverTimestamp(),
-        });
+        }));
       }
       return;
     } catch (err: any) {
