@@ -6,6 +6,7 @@ interface RegistrationTabProps {
   teams: Team[];
   onAddTeam: (team: Team) => void;
   onRemoveTeam: (teamId: string) => void;
+  onResetGame?: () => void;
 }
 
 const PREDEFINED_COLORS = [
@@ -17,7 +18,7 @@ const PREDEFINED_COLORS = [
   { name: 'Cyan', hex: '#06B6D4', bg: 'bg-cyan-500/10 dark:bg-cyan-500/15', border: 'border-cyan-500', text: 'text-cyan-600 dark:text-cyan-400' }
 ];
 
-export const RegistrationTab: React.FC<RegistrationTabProps> = ({ teams, onAddTeam, onRemoveTeam }) => {
+export const RegistrationTab: React.FC<RegistrationTabProps> = ({ teams, onAddTeam, onRemoveTeam, onResetGame }) => {
   const [name, setName] = useState('');
   const [shortName, setShortName] = useState('');
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
@@ -102,22 +103,42 @@ export const RegistrationTab: React.FC<RegistrationTabProps> = ({ teams, onAddTe
 
           <button
             type="submit"
-            className="w-full md:w-auto py-2.5 px-6 rounded-xl text-sm font-bold uppercase tracking-wider text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 cursor-pointer transition-all duration-150 flex items-center justify-center gap-2"
+            disabled={teams.length >= 4}
+            className={`w-full md:w-auto py-2.5 px-6 rounded-xl text-sm font-bold uppercase tracking-wider text-white transition-all duration-150 flex items-center justify-center gap-2 ${
+              teams.length >= 4 
+                ? 'bg-slate-400 cursor-not-allowed opacity-50' 
+                : 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 cursor-pointer'
+            }`}
           >
             <Plus className="w-4 h-4" />
-            <span>Add Team</span>
+            <span>{teams.length >= 4 ? 'Maximum 4 Teams Reached' : 'Add Team'}</span>
           </button>
         </form>
       </div>
 
       {/* List of Teams */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
-        <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white uppercase tracking-tight flex items-center justify-between">
-          <span>Registered Teams</span>
-          <span className="text-sm bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-3 py-1 rounded-full">
-            {teams.length}
-          </span>
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+            <span>Registered Teams</span>
+            <span className="text-sm bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-3 py-1 rounded-full">
+              {teams.length} / 4
+            </span>
+          </h3>
+          
+          {onResetGame && (
+            <button
+              onClick={() => {
+                if(window.confirm('Are you sure you want to reset the game? This will clear all teams and scores.')) {
+                  onResetGame();
+                }
+              }}
+              className="text-xs font-bold uppercase tracking-wider px-3 py-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+            >
+              Reset Teams & Game
+            </button>
+          )}
+        </div>
 
         {teams.length === 0 ? (
           <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
@@ -136,11 +157,19 @@ export const RegistrationTab: React.FC<RegistrationTabProps> = ({ teams, onAddTe
                 />
                 <div className="pl-3 flex justify-between items-start">
                   <div>
-                    <h4 className="font-display font-bold text-slate-900 dark:text-white uppercase">
-                      {team.shortName}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-display font-bold text-slate-900 dark:text-white uppercase">
+                        {team.shortName}
+                      </h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        Playing
+                      </span>
+                    </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       {team.name}
+                    </p>
+                    <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-2">
+                      Current Score: {team.score} PTS
                     </p>
                   </div>
                   <button

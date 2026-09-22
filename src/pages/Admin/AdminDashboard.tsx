@@ -20,7 +20,7 @@ import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import { RegistrationTab } from '../../components/admin/RegistrationTab';
 import { RoundSelectionTab } from '../../components/admin/RoundSelectionTab';
 
-export type AdminTab = 'DASHBOARD' | 'REGISTRATION' | 'ROUNDS';
+export type AdminTab = 'DASHBOARD' | 'REGISTRATION' | 'ROUNDS' | 'RULES' | 'SETTINGS' | 'LEADERBOARD';
 
 export const AdminDashboard: React.FC = () => {
   const { navigate } = useRouter();
@@ -37,7 +37,8 @@ export const AdminDashboard: React.FC = () => {
     changeDisplayMode,
     addTeam,
     removeTeam,
-    selectRound
+    selectRound,
+    resetAll
   } = useQuiz();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('DASHBOARD');
@@ -62,23 +63,31 @@ export const AdminDashboard: React.FC = () => {
         currentQuestionNumber={currentQuestion?.number}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Tabs Navigation */}
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-          {(['DASHBOARD', 'REGISTRATION', 'ROUNDS'] as AdminTab[]).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-bold uppercase tracking-wider rounded-t-lg transition-colors ${
-                activeTab === tab 
-                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400' 
-                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-1 overflow-hidden w-full max-w-[1600px] mx-auto">
+        {/* Left Sidebar Navigation */}
+        <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col pt-6 pb-4">
+          <div className="px-6 mb-6">
+            <h3 className="font-display font-bold text-xs uppercase tracking-widest text-slate-400">Admin Menu</h3>
+          </div>
+          <nav className="flex flex-col gap-1 px-4">
+            {(['DASHBOARD', 'REGISTRATION', 'ROUNDS', 'RULES', 'SETTINGS', 'LEADERBOARD'] as AdminTab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-3 text-sm font-bold uppercase tracking-wider rounded-lg text-left transition-colors ${
+                  activeTab === tab 
+                    ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' 
+                    : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
 
         {activeTab === 'DASHBOARD' && (
           <div className="space-y-6">
@@ -362,6 +371,7 @@ export const AdminDashboard: React.FC = () => {
             teams={teamList}
             onAddTeam={addTeam}
             onRemoveTeam={removeTeam}
+            onResetGame={resetAll}
           />
         )}
 
@@ -378,7 +388,39 @@ export const AdminDashboard: React.FC = () => {
           />
         )}
 
-      </main>
+        {activeTab === 'RULES' && (
+          <div className="p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800">
+            <h3 className="text-lg font-bold uppercase tracking-wide">Rules Configuration</h3>
+            <p className="text-sm text-slate-500 mt-2">Rules editor will be added here in a future update.</p>
+          </div>
+        )}
+
+        {activeTab === 'SETTINGS' && (
+          <div className="p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800">
+            <h3 className="text-lg font-bold uppercase tracking-wide">Quiz Settings</h3>
+            <p className="text-sm text-slate-500 mt-2">Global settings will be added here.</p>
+          </div>
+        )}
+
+        {activeTab === 'LEADERBOARD' && (
+          <div className="p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800">
+            <h3 className="text-lg font-bold uppercase tracking-wide">Leaderboard Overview</h3>
+            <div className="mt-4 flex flex-col gap-4">
+              {teamList.sort((a, b) => b.score - a.score).map((team, idx) => (
+                <div key={team.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <span className="font-bold text-xl w-8">{idx + 1}</span>
+                    <span className="font-bold uppercase">{team.name}</span>
+                  </div>
+                  <span className="font-bold text-xl">{team.score} PTS</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        </main>
+      </div>
 
       {/* Reset Confirmation Dialog */}
       <ConfirmModal

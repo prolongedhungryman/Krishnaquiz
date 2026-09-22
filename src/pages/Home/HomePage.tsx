@@ -93,15 +93,7 @@ const ROUNDS_INFO = [
   },
 ];
 
-const RULES = [
-  'Each round has 10 questions worth 10 points each.',
-  'Teams must be registered before the competition begins.',
-  'The quiz master has final authority on all answers.',
-  'No electronic devices are allowed during the competition.',
-  'In the Buzzer Round, incorrect answers result in a penalty.',
-  'The Guessing Round awards bonus points for fewer clues used.',
-  'Audience members may participate only in the Audience Round.',
-];
+
 
 export const HomePage: React.FC = () => {
   const { navigate } = useRouter();
@@ -324,34 +316,7 @@ export const HomePage: React.FC = () => {
               );
             })}
 
-            {/* 8th card — Rules Summary */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 1.2 }}
-              className="relative p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800/50 shadow-sm sm:col-span-2 lg:col-span-2"
-            >
-              <div className="flex items-start gap-4">
-                <div className="p-2.5 rounded-xl bg-slate-200/60 dark:bg-slate-700/40 text-slate-600 dark:text-slate-400 shrink-0">
-                  <BookOpen className="w-5 h-5" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-display font-bold text-base text-slate-900 dark:text-white uppercase tracking-tight mb-3">
-                    Competition Rules
-                  </h4>
-                  <ul className="space-y-2">
-                    {RULES.map((rule, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
-                        <span className="w-5 h-5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-[10px] font-bold font-mono shrink-0 mt-0.5">
-                          {i + 1}
-                        </span>
-                        <span className="leading-relaxed">{rule}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </motion.div>
+
           </div>
         </div>
       </section>
@@ -359,7 +324,7 @@ export const HomePage: React.FC = () => {
       {/* Footer */}
       <footer className="relative z-10 py-6 px-6 text-center border-t border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
         <p className="text-xs text-slate-400 dark:text-slate-600">
-          Quiz Tournament Management Platform • Firebase Realtime Database • Built with ❤️
+          Powered by ICT Club, Oxford Secondary School
         </p>
       </footer>
     </div>

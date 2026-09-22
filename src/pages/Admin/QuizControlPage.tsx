@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Check, 
   ChevronLeft, 
@@ -12,7 +12,12 @@ import {
   Sliders,
   Tv,
   HelpCircle,
-  Award
+  Award,
+  Maximize,
+  Minimize,
+  Timer,
+  BookOpen,
+  Trophy
 } from 'lucide-react';
 import { useQuiz } from '../../hooks/useQuiz';
 import { AdminHeader } from '../../components/admin/AdminHeader';
@@ -41,6 +46,38 @@ export const QuizControlPage: React.FC = () => {
 
   const [pointsDelta, setPointsDelta] = useState<number>(1);
   const [showAnswer, setShowAnswer] = useState<boolean>(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showRules, setShowRules] = useState(false);
+  
+  // Timer state
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+
+  useEffect(() => {
+    let interval: any;
+    if (isTimerRunning && timeLeft > 0) {
+      interval = setInterval(() => setTimeLeft((t) => t - 1), 1000);
+    } else if (timeLeft === 0) {
+      setIsTimerRunning(false);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning, timeLeft]);
+
+  // Reset timer when question changes
+  useEffect(() => {
+    setTimeLeft(30);
+    setIsTimerRunning(false);
+  }, [currentQuestion?.id]);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
+  };
 
   const teamList = Object.values(teams);
   const roundList = Object.values(rounds);
@@ -92,50 +129,65 @@ export const QuizControlPage: React.FC = () => {
 
           {/* Quick Display Mode Selectors */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 mr-1 hidden sm:inline">
-              Projector:
-            </span>
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
             <button
-              id="ctrl-mode-question-btn"
-              onClick={() => changeDisplayMode('QUESTION')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-                status.displayMode === 'QUESTION'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
+              onClick={() => setShowRules(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
             >
-              Question
+              <BookOpen className="w-3.5 h-3.5" /> Rules
             </button>
             <button
-              id="ctrl-mode-leaderboard-btn"
-              onClick={() => changeDisplayMode('LEADERBOARD')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-                status.displayMode === 'LEADERBOARD'
-                  ? 'bg-amber-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
+              onClick={toggleFullscreen}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
             >
-              Leaderboard
-            </button>
-            <button
-              id="ctrl-mode-welcome-btn"
-              onClick={() => changeDisplayMode('WELCOME')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
-                status.displayMode === 'WELCOME'
-                  ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-              }`}
-            >
-              Welcome
+              {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />} 
+              {isFullscreen ? 'Exit FS' : 'Fullscreen'}
             </button>
           </div>
         </div>
 
+        {/* Fullscreen Rules Modal */}
+        {showRules && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-4xl max-h-[80vh] flex flex-col shadow-2xl">
+              <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                <h2 className="text-2xl font-bold uppercase tracking-wider">Rules: {activeRound?.title}</h2>
+                <button onClick={() => setShowRules(false)} className="text-slate-500 hover:text-slate-700">Close</button>
+              </div>
+              <div className="p-6 overflow-y-auto space-y-4">
+                <p className="text-lg font-medium">{activeRound?.description}</p>
+                <div className="mt-4 p-5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl space-y-3">
+                  <p className="font-bold flex items-center gap-2">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-700">1</span> 
+                    Each question is worth {activeRound?.defaultPoints} points.
+                  </p>
+                  <p className="font-bold flex items-center gap-2">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-700">2</span> 
+                    You have 30 seconds to answer.
+                  </p>
+                  <p className="font-bold flex items-center gap-2">
+                    <span className="w-6 h-6 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-700">3</span> 
+                    Wait for the quiz master's confirmation.
+                  </p>
+                </div>
+                <div className="pt-6">
+                  <button 
+                    onClick={() => setShowRules(false)}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm uppercase tracking-widest"
+                  >
+                    Close Rules
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Question Viewer & Question Navigation Controls */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           
-          {/* Question Grid or Active Question View (Span 2) */}
-          <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs flex flex-col space-y-6">
+          {/* Question Grid or Active Question View */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs flex flex-col space-y-6">
             {status.displayMode === 'GRID' ? (
               <div className="space-y-4">
                 <h3 className="font-display font-bold text-lg uppercase text-slate-900 dark:text-white flex items-center justify-between">
@@ -168,6 +220,7 @@ export const QuizControlPage: React.FC = () => {
                 </div>
               </div>
             ) : (
+              <>
               <div className="flex flex-col h-full justify-between space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -185,6 +238,30 @@ export const QuizControlPage: React.FC = () => {
                       className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
                     >
                       Back to Grid
+                    </button>
+                  </div>
+                </div>
+
+                {/* Timer Component */}
+                <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+                  <div className="flex items-center gap-3">
+                    <Timer className={`w-8 h-8 ${timeLeft <= 10 ? 'text-red-500 animate-pulse' : 'text-indigo-500'}`} />
+                    <span className={`font-display font-black text-3xl tabular-nums ${timeLeft <= 10 ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
+                      00:{String(timeLeft).padStart(2, '0')}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsTimerRunning(!isTimerRunning)}
+                      className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg uppercase text-xs"
+                    >
+                      {isTimerRunning ? 'Pause' : 'Start Timer'}
+                    </button>
+                    <button 
+                      onClick={() => { setTimeLeft(30); setIsTimerRunning(false); }}
+                      className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-lg uppercase text-xs"
+                    >
+                      Reset
                     </button>
                   </div>
                 </div>
@@ -220,146 +297,81 @@ export const QuizControlPage: React.FC = () => {
                   )}
                 </div>
               </div>
-            )}
-          </div>
+              
+              {/* ANSWERING TEAM LOGIC IN QUESTION MODE */}
+              <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between pb-2 mb-4">
+                  <div>
+                    <h3 className="font-display font-black text-xl text-slate-900 dark:text-white uppercase tracking-tight">
+                      Answering Team
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Select who is answering to award points.
+                    </p>
+                  </div>
+                </div>
 
-          {/* Quick Round Switcher & Question Navigator */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs flex flex-col justify-between space-y-6">
-            <div className="space-y-4">
-              <h3 className="font-display font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wider">
-                Round Selection
-              </h3>
-
-              {/* Modular Round Buttons */}
-              <div className="space-y-2">
-                {roundList.map((rnd) => {
-                  const isCurrent = rnd.id === status.activeRoundId;
-                  return (
-                    <button
-                      key={rnd.id}
-                      id={`ctrl-round-btn-${rnd.id}`}
-                      onClick={() => selectRound(rnd.id)}
-                      className={`w-full p-3 rounded-xl text-left border transition-all cursor-pointer flex items-center justify-between ${
-                        isCurrent
-                          ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-200 shadow-xs'
-                          : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      <div>
-                        <span className="block font-display font-bold text-xs uppercase">
-                          {rnd.title}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {rnd.questions.length} Questions
-                        </span>
-                      </div>
-                      {isCurrent && (
-                        <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Quick Question Number Jump Grid */}
-              <div className="pt-2">
-                <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                  Jump to Question
-                </span>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {activeRound?.questions.map((q, idx) => {
-                    const isQActive = idx === status.currentQuestionIndex;
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {teamList.map((team) => {
+                    const isSelected = status.selectedAnsweringTeamId === team.id;
                     return (
-                      <button
-                        key={q.id}
-                        id={`ctrl-jump-q-${idx + 1}`}
-                        onClick={() => selectQuestion(idx)}
-                        className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-colors ${
-                          isQActive
-                            ? 'bg-indigo-600 text-white shadow-xs'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                        }`}
+                      <div
+                        key={team.id}
+                        className={`rounded-2xl border ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-500/50' : 'border-slate-200 dark:border-slate-800'} bg-slate-50/60 dark:bg-slate-850/50 p-5 flex flex-col space-y-4 relative overflow-hidden transition-all`}
                       >
-                        Q{idx + 1}
-                      </button>
+                        <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: team.color }} />
+                        
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-display font-extrabold text-lg text-slate-900 dark:text-white uppercase">
+                              {team.shortName}
+                            </h4>
+                            <span className="text-xs font-bold text-slate-500">
+                              SCORE: {team.score}
+                            </span>
+                          </div>
+                        </div>
+
+                        {!isSelected ? (
+                          <button
+                            onClick={() => selectAnsweringTeam(team.id)}
+                            className="w-full py-2.5 rounded-xl font-bold text-xs uppercase bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors cursor-pointer"
+                          >
+                            Select to Answer
+                          </button>
+                        ) : (
+                          <div className="space-y-2">
+                            <button
+                              onClick={async () => {
+                                const pts = currentQuestion?.points || 10;
+                                await awardPoints(team.id, pts);
+                                if (activeRound && currentQuestion) {
+                                  await markQuestionAnswered(activeRound.id, currentQuestion.id);
+                                }
+                                selectAnsweringTeam(undefined);
+                                changeDisplayMode('GRID');
+                              }}
+                              className="w-full py-2 rounded-lg font-bold text-xs uppercase text-white bg-emerald-600 hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-1"
+                            >
+                              <Check className="w-4 h-4" /> Correct (+{currentQuestion?.points || 10})
+                            </button>
+                            <button
+                              onClick={() => selectAnsweringTeam(undefined)}
+                              className="w-full py-2 rounded-lg font-bold text-xs uppercase text-red-600 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 cursor-pointer"
+                            >
+                              Incorrect / Clear
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
               </div>
-            </div>
+              </>
+            )}
           </div>
         </div>
-
-        {/* ANSWERING TEAM LOGIC */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-            <div>
-              <h3 className="font-display font-black text-xl text-slate-900 dark:text-white uppercase tracking-tight">
-                Answering Team
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Select who is answering to award points. (Points won't show unless selected).
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {teamList.map((team) => {
-              const isSelected = status.selectedAnsweringTeamId === team.id;
-              return (
-                <div
-                  key={team.id}
-                  className={`rounded-2xl border ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-500/50' : 'border-slate-200 dark:border-slate-800'} bg-slate-50/60 dark:bg-slate-850/50 p-5 flex flex-col space-y-4 relative overflow-hidden transition-all`}
-                >
-                  <div className="absolute top-0 left-0 right-0 h-1.5" style={{ backgroundColor: team.color }} />
-                  
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-display font-extrabold text-lg text-slate-900 dark:text-white uppercase">
-                        {team.shortName}
-                      </h4>
-                      <span className="text-xs font-bold text-slate-500">
-                        SCORE: {team.score}
-                      </span>
-                    </div>
-                  </div>
-
-                  {!isSelected ? (
-                    <button
-                      onClick={() => selectAnsweringTeam(team.id)}
-                      className="w-full py-2.5 rounded-xl font-bold text-xs uppercase bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors cursor-pointer"
-                    >
-                      Select to Answer
-                    </button>
-                  ) : (
-                    <div className="space-y-2">
-                      <button
-                        onClick={async () => {
-                          const pts = currentQuestion?.points || 10;
-                          await awardPoints(team.id, pts);
-                          if (activeRound && currentQuestion) {
-                            await markQuestionAnswered(activeRound.id, currentQuestion.id);
-                          }
-                          selectAnsweringTeam(undefined);
-                          changeDisplayMode('GRID');
-                        }}
-                        className="w-full py-2 rounded-lg font-bold text-xs uppercase text-white bg-emerald-600 hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-1"
-                      >
-                        <Check className="w-4 h-4" /> Correct (+{currentQuestion?.points || 10})
-                      </button>
-                      <button
-                        onClick={() => selectAnsweringTeam(undefined)}
-                        className="w-full py-2 rounded-lg font-bold text-xs uppercase text-red-600 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 cursor-pointer"
-                      >
-                        Incorrect / Clear
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
 
       </main>
     </div>

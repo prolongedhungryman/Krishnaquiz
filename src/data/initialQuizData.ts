@@ -1,6 +1,7 @@
 import { QuizData, Team, Round, Question } from '../types';
+import { generalQuestions } from './generalQuestions';
 
-export const INITIAL_TEAMS: Record<string, Team> = {}; // Start empty, added dynamically
+export const INITIAL_TEAMS: Record<string, Team> = {};
 
 const generateDummyQuestions = (roundId: string, count: number): Question[] => {
   return Array.from({ length: count }).map((_, i) => ({
@@ -22,8 +23,8 @@ export const INITIAL_ROUNDS: Record<string, Round> = {
     description: 'Direct verbal questions.',
     order: 1,
     defaultPoints: 10,
-    totalQuestions: 10,
-    questions: generateDummyQuestions('general', 10),
+    totalQuestions: 50,
+    questions: generalQuestions,
   },
   guessing: {
     id: 'guessing',
