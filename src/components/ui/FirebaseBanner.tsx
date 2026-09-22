@@ -26,17 +26,7 @@ export const FirebaseBanner: React.FC<{ compact?: boolean }> = ({ compact = fals
 
   // Development simulation notice
   if (compact) {
-    return (
-      <button
-        id="dev-sim-status-btn"
-        onClick={() => setIsExpanded(true)}
-        title="Running in real-time dev mode. Click to view Firebase configuration info."
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-colors"
-      >
-        <Database className="w-3 h-3 animate-pulse" />
-        <span>Dev Simulation Active</span>
-      </button>
-    );
+    return null; // Don't show dev simulation badge in header
   }
 
   return (

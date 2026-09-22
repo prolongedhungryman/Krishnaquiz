@@ -284,12 +284,33 @@ export async function resetAllScores(): Promise<void> {
 
 /**
  * Reset full competition back to initial default seed state.
+ * Only clears teams and answered questions — preserves rounds.
  */
 export async function resetEntireCompetition(): Promise<void> {
+  const resetData: Partial<QuizData> = {
+    teams: {},
+    answeredQuestions: {},
+    status: {
+      ...INITIAL_QUIZ_DATA.status,
+      updatedAt: Date.now(),
+    },
+  };
   if (isFirebaseConfigured && database) {
-    await set(ref(database, 'quiz'), INITIAL_QUIZ_DATA);
+    await update(ref(database), {
+      'quiz/teams': {},
+      'quiz/answeredQuestions': {},
+      'quiz/status': resetData.status,
+      'quiz/status/updatedAt': serverTimestamp(),
+    });
   } else {
-    saveLocalState(INITIAL_QUIZ_DATA);
+    const state = getLocalState();
+    state.teams = {};
+    state.answeredQuestions = {};
+    state.status = {
+      ...INITIAL_QUIZ_DATA.status,
+      updatedAt: Date.now(),
+    };
+    saveLocalState(state);
   }
 }
 

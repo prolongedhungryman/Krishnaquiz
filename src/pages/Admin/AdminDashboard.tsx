@@ -19,6 +19,7 @@ import { Badge } from '../../components/ui/Badge';
 import { ConfirmModal } from '../../components/ui/ConfirmModal';
 import { RegistrationTab } from '../../components/admin/RegistrationTab';
 import { RoundSelectionTab } from '../../components/admin/RoundSelectionTab';
+import { LeaderboardAdminView } from '../../components/admin/LeaderboardAdminView';
 
 export type AdminTab = 'DASHBOARD' | 'REGISTRATION' | 'ROUNDS' | 'RULES' | 'SETTINGS' | 'LEADERBOARD';
 
@@ -34,6 +35,7 @@ export const AdminDashboard: React.FC = () => {
     awardPoints, 
     isScoringBusy, 
     resetScores,
+    changeScoreDirect,
     changeDisplayMode,
     addTeam,
     removeTeam,
@@ -403,20 +405,13 @@ export const AdminDashboard: React.FC = () => {
         )}
 
         {activeTab === 'LEADERBOARD' && (
-          <div className="p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xs border border-slate-200 dark:border-slate-800">
-            <h3 className="text-lg font-bold uppercase tracking-wide">Leaderboard Overview</h3>
-            <div className="mt-4 flex flex-col gap-4">
-              {teamList.sort((a, b) => b.score - a.score).map((team, idx) => (
-                <div key={team.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <span className="font-bold text-xl w-8">{idx + 1}</span>
-                    <span className="font-bold uppercase">{team.name}</span>
-                  </div>
-                  <span className="font-bold text-xl">{team.score} PTS</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <LeaderboardAdminView
+            teams={teamList}
+            rounds={rounds}
+            activeRoundId={status.activeRoundId}
+            onManualScoreUpdate={changeScoreDirect}
+            onRefresh={() => window.location.reload()}
+          />
         )}
 
         </main>
