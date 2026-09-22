@@ -56,10 +56,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             </span>
           </div>
 
-          <Badge variant="live" className="text-[11px] px-2.5 py-0.5">
-            LIVE ●
-          </Badge>
-
           {activeRoundTitle && (
             <span className="hidden md:inline-flex text-xs font-mono text-slate-500 dark:text-slate-400 border-l border-slate-200 dark:border-slate-700 pl-3">
               {activeRoundTitle} {currentQuestionNumber ? `• Q${String(currentQuestionNumber).padStart(2, '0')}` : ''}

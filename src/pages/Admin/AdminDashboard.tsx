@@ -130,8 +130,8 @@ export const AdminDashboard: React.FC = () => {
                   <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Quiz Status
                   </span>
-                  <Badge variant="live" className="text-[11px]">
-                    LIVE ●
+                  <Badge variant="neutral" className="text-[11px]">
+                    Active
                   </Badge>
                 </div>
 
