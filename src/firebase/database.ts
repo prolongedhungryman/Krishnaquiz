@@ -58,7 +58,10 @@ function getLocalState(): QuizData {
   try {
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // ALWAYS use the latest hardcoded rounds/questions from source code, ignoring cached ones
+      parsed.rounds = INITIAL_QUIZ_DATA.rounds;
+      return parsed;
     }
   } catch (err) {
     console.warn('[Quiz State] Failed to read localStorage', err);
@@ -184,6 +187,7 @@ function normalizeFirebaseData(val: Record<string, unknown>): QuizData {
     status: (val.status as QuizData['status']) || INITIAL_QUIZ_DATA.status,
     teams: (val.teams as QuizData['teams']) || {},
     events: (val.events as QuizData['events']) || {},
+    rounds: INITIAL_QUIZ_DATA.rounds, // ALWAYS use latest hardcoded questions
   };
 
   const rawAQ = val.answeredQuestions as Record<string, unknown> | undefined;
